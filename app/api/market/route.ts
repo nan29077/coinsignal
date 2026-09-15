@@ -1,0 +1,1 @@
+import {identity,fail,ok} from '@/lib/store';import {market,exchangeOf} from '@/lib/market';export async function GET(req:Request){try{await identity();const e=exchangeOf(new URL(req.url).searchParams.get('exchange'));const coins=await market(e);return ok({coins,receivedAt:Date.now(),source:e});}catch(e){return fail(e);}}

@@ -1,0 +1,1 @@
+import {env} from 'cloudflare:workers';import {identity,ok,fail} from '@/lib/store';export async function GET(){try{await identity();return ok({openai:!!env.OPENAI_API_KEY,storage:!!env.DB,liveTrading:false,news:false,scheduler:false});}catch(e){return fail(e);}}

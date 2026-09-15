@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict';
+import ts from 'typescript';
+import {readFileSync} from 'node:fs';
+const src=ts.transpileModule(readFileSync(new URL('../lib/paper.ts',import.meta.url),'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ES2022}}).outputText;
+const {paperTrade,initialPortfolio,validateSettings}=await import('data:text/javascript;base64,'+Buffer.from(src).toString('base64'));
+const quote={bids:[{price:99,qty:100000}],asks:[{price:100,qty:100000}],timestamp:Date.now()};
+const p=initialPortfolio();const initial=p.cash;paperTrade(p,{side:'buy',symbol:'BTC',amount:1000000,id:'test-buy',reason:'test'},quote);
+assert.ok(Math.abs(p.cash-(initial-1000000))<1e-6);assert.ok(Math.abs(p.positions[0].cost-1000000)<1e-6);
+const buyQty=p.positions[0].qty;const expectedCredit=buyQty*99*(1-p.settings.slippage/100)*(1-p.settings.fee/100);
+paperTrade(p,{side:'sell',symbol:'BTC',id:'test-sell',reason:'test'},quote);assert.equal(p.positions.length,0);assert.ok(Math.abs(p.cash-(initial-1000000+expectedCredit))<1e-6);assert.ok(Math.abs(p.trades[0].pnl-(expectedCredit-1000000))<1e-6);assert.ok(p.cash<initial);
+assert.throws(()=>paperTrade(p,{side:'buy',symbol:'BTC',amount:1000000,id:'test-buy',reason:'test'},quote),/이미 처리/);
+const q=initialPortfolio(),before=JSON.stringify(q);assert.throws(()=>paperTrade(q,{side:'buy',symbol:'BTC',amount:1000000,id:'x',reason:'test'},{...quote,asks:[{price:100,qty:1}]}),/잔량/);assert.equal(JSON.stringify(q),before);
+assert.throws(()=>paperTrade(q,{side:'buy',symbol:'BTC',amount:11000000,id:'y',reason:'test'},quote),/한도/);assert.equal(JSON.stringify(q),before);
+assert.throws(()=>validateSettings({...q.settings,fee:-1}));assert.throws(()=>validateSettings({...q.settings,orderSize:NaN}));
+console.log('PASS: cash conservation, two-sided costs, PnL, duplicate rejection, insufficient depth atomicity, balance/limit enforcement, invalid settings');
