@@ -9,3 +9,4 @@ data/
 .sites-runtime/
 .wrangler/
 .next/
+next-env.d.ts
