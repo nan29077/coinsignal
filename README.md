@@ -1,126 +1,104 @@
-# vinext-starter
+# CoinSignal v2 — AI 코인 분산투자 운용기
 
-A clean full-stack starter running on [vinext](https://github.com/cloudflare/vinext), with optional Cloudflare D1 and Drizzle support.
+업비트·빗썸·코인원 원화 마켓에서 **OpenAI가 웹 검색으로 정보를 조사해 투자할 코인과 비중을 정하고**, 거래소별 **모의투자 계좌와 실거래 계좌를 서로 독립적으로** 운용하는 로컬/서버용 앱입니다.
 
-## Prerequisites
+> ⚠️ 실거래 기능은 실제 자금으로 주문을 냅니다. AI 판단은 틀릴 수 있고 수익을 보장하지 않습니다. 처음에는 **소액**으로 동작을 확인하세요.
 
-- Node.js `>=22.13.0`
-- Portable: Windows, macOS, or Linux; no Bash required
-- Managed Linux: managed Linux runtime with Bash, `flock`, `curl`, `sha256sum`, and GNU `timeout`
-- Git is required only for publishing
+## 구조 한눈에 보기
 
-## Sites Lifecycle
-
-The Sites initializer copies the shared starter and selects managed-linux only when `SITES_MANAGED_LINUX_CONTAINER=1`; otherwise it selects portable. It saves the selection only in ignored `.sites-runtime/execution-profile.json`. Both profiles copy/configure first, then use the plugin's separate `install-dependencies.mjs` step to measure installation independently. Edit source under `app/` and follow the Sites skill for installation, preview, builds, and publishing.
-
-Whenever reopening or moving a checkout, run `node <plugin-root>/scripts/configure-execution-profile.mjs` before project commands. Profile changes do not alter tracked source or require reinstalling otherwise-valid dependencies; restart an existing preview to use the new selection. Do not commit or upload `.sites-runtime/`.
-
-This starter does not use `wrangler.jsonc`.
-
-`install:ci` runs `npm ci` once against the shared lockfile, disables parent-workspace discovery, and includes required dev/optional dependencies despite production/omit settings. Sharp defaults to prebuilt binaries unless explicitly configured otherwise. Do not overlap installers.
-
-- **Portable:** Preserve host HOME, npm cache, registry, proxy, temporary paths, retry/concurrency settings, and lifecycle-script policy. Use `--prefer-offline --no-audit --no-fund`.
-- **Managed Linux:** Use the existing project-local HOME/cache/tmp setup and Linux install lock, tarball preflight, and timeout. Restore the image-seeded npm cache only when its lockfile hash matches; retain network fallback. Builds keep their existing timeout. These helpers are not invoked by the portable profile.
-
-`scripts/sites-env.mjs` preserves the caller's HOME, npm cache, proxy, XDG, and temporary-directory configuration while defaulting Wrangler and Miniflare state to the checkout. If npm reports an unwritable cache, select a writable path with `npm_config_cache` for that install. The `dev` and `start` scripts also keep Wrangler logs inside the checkout. Generated `.sites-runtime/` and `.wrangler/` directories are disposable and ignored by Git.
-
-On portable, `npm run dev` uses `vinext dev` with HMR, starting at port 5173. Vinext records the running server in ignored `.vinext/` state, rejects an ordinary duplicate launch, and recovers stale state after a stopped process; exactly simultaneous starts can race. Pass `--port <port>` or `--hostname <host>` after `npm run dev --` when needed; keep portable previews on loopback.
-
-On managed Linux, use `sites-preview start` only for requested browser QA. The project's dev script runs Vite and accepts the supervisor's `--host 0.0.0.0 --port 4173 --strictPort` arguments. The internal browser uses `http://terminal.local:4173/`; it is not a user-facing URL. The supervisor owns the preview lifecycle. The ignored local profile survives the supervisor's cleared process environment.
-
-The portable profile simulates ChatGPT sign-in only for loopback development requests. Visit `/signin-with-chatgpt?return_to=/` to sign in as `local_seedy` (`seedy@sites.test`, display name `Seedy`) and `/signout-with-chatgpt?return_to=/` to sign out. The development cookie preserves that identity across server restarts. Mock auth is disabled in the managed-linux profile and is not included in production builds; hosted authentication remains dispatch-owned.
-
-The Worker uses `vinext/server/fetch-handler`, including Vinext's config-aware image handling. After building, `npm start` runs that Worker locally through Wrangler on `127.0.0.1`, sharing `.wrangler/state` with dev preview and local D1 migrations; it does not deploy the site or simulate sign-in. Use the URL printed by the server. Pass `npm start -- --port <port>` to select a different built-preview port.
-
-Local previews use Miniflare's placeholder `Request.cf` metadata without a network lookup. Set `CLOUDFLARE_CF_FETCH_ENABLED=true` to opt into fetching preview metadata; this setting does not change hosted request metadata.
-
-Local tool usage metrics are disabled by default. Set `WRANGLER_SEND_METRICS=true` to opt in.
-
-## Included Shape
-
-- edit site code under `app/`
-- `app/chatgpt-auth.ts` provides optional dispatch-owned ChatGPT sign-in helpers
-- `.openai/hosting.json` declares optional Sites D1 and R2 bindings
-- `vite.config.ts` simulates declared bindings for local development
-- `db/index.ts` reads the D1 binding from the Cloudflare Worker environment
-- `db/schema.ts` starts intentionally empty
-- `@cloudflare/workers-types` provides Worker types; `cloudflare-env.d.ts` declares optional `DB`/`BUCKET` bindings—update these declarations if binding names change
-- `examples/d1/` contains an optional D1 example surface
-- `drizzle.config.ts` supports local migration generation when needed
-
-## Workspace Auth Headers
-
-Signed-in visitors receive both `oai-authenticated-user-id` and `oai-authenticated-user-email`. Private Sites require every visitor to sign in; public Sites may also have anonymous visitors, for whom neither header is present.
-
-The user ID is stable for the same user on the same Site and different across Sites. Use it as the durable user key; use email and name for display or contact purposes.
-
-SIWC-authenticated workspace sites may also receive `oai-authenticated-user-full-name` when the user's SIWC profile has a non-empty `name` claim. The full-name value is percent-encoded UTF-8 and is accompanied by `oai-authenticated-user-full-name-encoding: percent-encoded-utf-8`.
-
-Treat the full name as optional and fall back to email when it is absent:
-
-```tsx
-import { headers } from "next/headers";
-
-export default async function Home() {
-  const requestHeaders = await headers();
-  const userId = requestHeaders.get("oai-authenticated-user-id");
-  const email = requestHeaders.get("oai-authenticated-user-email");
-  const encodedFullName = requestHeaders.get("oai-authenticated-user-full-name");
-  const fullName =
-    encodedFullName &&
-    requestHeaders.get("oai-authenticated-user-full-name-encoding") ===
-      "percent-encoded-utf-8"
-      ? decodeURIComponent(encodedFullName)
-      : null;
-
-  const displayName = fullName ?? email;
-  // ...
-}
+```
+[스케줄러 1분 주기]
+  ├─ 리서치 주기가 되면 (거래소별)
+  │    1) 스크리닝: 스테이블코인·경고종목·신규상장·저거래대금 제외 → 후보 N개
+  │    2) OpenAI (선택 모델 + web_search): 뉴스/공지/규제 조사 → 종목·비중·손절/익절·출처(JSON)
+  │    3) 검증: 후보 밖 종목·출처 없는 추천 제외, 비중 정규화, 예산 기록
+  │    4) 활성화된 계좌마다 리밸런싱 계획 생성
+  │         ├─ 자동 실행 계좌 → 즉시 실행
+  │         └─ 승인 계좌 → 텔레그램/웹 승인 대기 (만료 시간 설정)
+  └─ 계좌 감시 (매분, 승인 방식과 무관)
+       손절·익절 자동 매도 / 일일 손실 한도 도달 시 계좌 정지 / 미체결 주문 확인 / 자산 기록
 ```
 
-## Optional Dispatch-Owned ChatGPT Sign-In
+- 계좌 6개: `모의투자`·`실거래` × `업비트`·`빗썸`·`코인원`. 각각 켜고 끄기, 자동/승인 방식, 손실 한도를 따로 설정합니다.
+- 실거래 계좌는 거래소 **원화 잔고 전체**를 운용 대상으로 봅니다. 앱이 산 코인만 관리하며, 직접 보유하던 다른 코인은 건드리지 않습니다.
+- 종목 수와 비중은 AI가 정합니다. 리밸런싱 허용 오차(기본 2%p) 이내의 차이는 매매하지 않습니다.
 
-Import the ready-to-use helpers from `app/chatgpt-auth.ts` when the site needs optional or required ChatGPT sign-in:
+## 설치와 실행 (Windows 로컬 PC)
 
-- Use `getChatGPTUser()` for optional signed-in UI.
-- Use the returned `userId` as the stable user key for user-owned records; do not use email as a durable identifier.
-- Use `requireChatGPTUser(returnTo)` for server-rendered pages that should send anonymous visitors through Sign in with ChatGPT.
-- In a Server Component, start sign-in with `<a href={chatGPTSignInPath(returnTo)} target="_top">`. The auth helper module is server-only; do not import it into a Client Component.
-- Do not use `fetch`, XHR, a client-side router, or a framework link that can prefetch the sign-in route. SIWC must start as a top-level navigation.
-- Never request the AuthAPI authorization endpoint directly. The dispatch-owned `/signin-with-chatgpt` route must start the SIWC flow.
-- Use `chatGPTSignOutPath(returnTo)` for browser sign-out links or actions.
-- Pass a same-origin relative `returnTo` path for the destination after sign-in or sign-out. The helper validates and safely encodes it.
-- Mark protected pages with `export const dynamic = "force-dynamic"` because they depend on per-request identity headers.
+1. [Node.js](https://nodejs.org) **22.13 이상** (LTS 권장) 설치
+2. 이 폴더에서 `start-windows.bat` 더블클릭
+   - 처음에는 의존성 설치와 화면 빌드가 진행됩니다.
+   - 콘솔에 **설정 토큰**이 표시됩니다.
+3. 브라우저에서 `http://127.0.0.1:8787` 접속 → 설정 토큰과 관리자 비밀번호(10자 이상) 입력
+4. **설정** 메뉴에서
+   - OpenAI API 키 저장 → 모델(Astra/Sol/Terra/Luna 또는 직접 입력), 추론 강도, **주기(시간)·예산(USD)·예산 기간** 설정 → 예약 리서치 켜기
+   - (실거래) 거래소 API 키 저장 → “잔고 조회 테스트”
+   - (선택) 텔레그램 봇 연결
+5. **대시보드**에서 운용할 계좌를 켜고 “상세·설정”에서 자동/승인 방식을 고릅니다.
 
-Dispatch owns `/signin-with-chatgpt`, `/signout-with-chatgpt`, `/callback`, the OAuth cookies, and identity header injection. Do not implement app routes for those reserved paths. Routes that do not import and call the helper remain anonymous-compatible.
+명령어로 실행하려면:
 
-SIWC establishes identity only; it does not prove workspace membership. Use the Sites hosting platform's access policy controls for workspace-wide restrictions, or enforce explicit server-side membership or allowlist checks.
-
-Use SIWC for account pages, user-specific dashboards, saved records, and write actions tied to the current ChatGPT user. Leave public content anonymous.
-
-## Local D1 migrations
-
-For a D1-backed local preview, generate SQL with `npm run db:generate`. Build once through the Sites skill's build entrypoint (or `npm run build` for standalone use) to generate `dist/server/wrangler.json`, rebuilding if bindings change. From the project root, apply each pending migration in order:
-
-```sh
-node --import ./scripts/sites-env.mjs ./node_modules/wrangler/bin/wrangler.js d1 execute DB --local --config dist/server/wrangler.json --persist-to .wrangler/state --file drizzle/0000_example.sql
+```bash
+npm install
+npm run build   # 웹 화면 빌드
+npm start       # http://127.0.0.1:8787
 ```
 
-Replace the filename with the pending migration and `DB` with your D1 binding name if different. Use `.wrangler/state`, not `.wrangler/state/v3`; Wrangler adds the versioned directories. Do not replay migrations already applied locally. This updates only the preview database; publishing applies production migrations separately.
+개발 모드: `npm run dev` → `http://127.0.0.1:5173` (API 서버 8787 자동 연결)
 
-## Diagnostic Commands
+> 창을 닫거나 PC가 절전 모드에 들어가면 자동 운용도 멈춥니다. 24시간 운용은 AWS 이전을 권장합니다.
 
-- `npm run install:ci`: perform the one locked dependency install
-- `npm run dev`: start the Vite/Vinext development server
-- `npm run build`: build the deployable Sites artifact
-- `npm run start`: preview the built Worker locally with D1/R2 support
-- `npm run db:generate`: generate Drizzle migrations after schema changes
+## 거래소 API 키 발급 시 주의
 
-When using the Sites plugin, follow its skill instructions for installation, builds, and publishing. These npm commands remain available for standalone use.
+| 거래소 | 필요한 권한 | 주의 |
+|---|---|---|
+| 업비트 | 자산조회, 주문조회, 주문하기 | **허용 IP 등록 필수** |
+| 빗썸 | 자산 조회, 주문 조회, 주문하기 | IP 등록 권장 |
+| 코인원 | 잔고 조회, 주문 조회, 주문 권한 | **접근 IP 등록 필수**, 키 유효기간 1년 |
 
-The portable build runs Vinext directly without a host `timeout` command. The managed-linux build uses `scripts/build-verified.sh` and its existing `SITES_BUILD_TIMEOUT` setting.
+- **출금 권한은 절대 부여하지 마세요.**
+- 가정용 인터넷은 공인 IP가 바뀔 수 있어 주문이 차단될 수 있습니다. AWS에서는 **Elastic IP**를 등록하세요.
 
-## Learn More
+## 비용과 예산
 
-- [vinext Documentation](https://github.com/cloudflare/vinext)
-- [Drizzle D1 Guide](https://orm.drizzle.team/docs/get-started/d1-new)
+- 설정한 **예산 기간**(일/주/월, 한국 시간 기준) 동안의 AI 사용액이 예산을 넘으면 리서치를 건너뛰고 알림을 보냅니다.
+- 1회 비용 = 토큰 비용 + 웹 검색 $10/1,000회. 리서치 화면에서 실제 사용량과 비용을 확인할 수 있습니다.
+- 예) Terra, 후보 20개, 4시간 주기, 거래소 3곳 → 하루 18회. 최근 실행 비용으로 기간 예상액이 표시됩니다.
+
+## 안전장치
+
+- 긴급 중단 스위치(설정): 모든 자동 매매·리서치·계획 실행 즉시 중단
+- 계좌별 일일 손실 한도: 도달 시 자동 정지(재개는 수동)
+- 종목별 손절/익절: AI가 제시(1~50% / 1~300% 범위로 제한), 없으면 계좌 기본값
+- AI 결과 검증: 후보 밖 종목·출처 없는 추천 제외, 전부 무효면 결과 폐기
+- 승인 후 실행 시 최신 시세로 다시 계산하며, 승인하지 않은 새 주문은 실행하지 않음
+- 주문 멱등성: 모든 실주문에 고유 client order id 사용, 응답 유실·5xx 시 거래소 조회로 결과 확정
+- API 키: AES-256-GCM 암호화 저장 (`data/master.key` — **반드시 백업**, 분실 시 키 재입력 필요)
+
+## AWS 이전 가이드 (요약)
+
+1. EC2 (Ubuntu, t3.small 이상) + **Elastic IP** → 거래소 API 키에 해당 IP 등록
+2. Node 22 설치 → 코드 복사 → `npm ci && npm run build`
+3. `.env`: `HOST=127.0.0.1`, `COINSIGNAL_SECURE_COOKIES=true`, `COINSIGNAL_TRUST_PROXY=true`, `COINSIGNAL_MASTER_KEY=`(로컬 `data/master.key` 값)
+4. Caddy 또는 Nginx로 HTTPS 리버스 프록시 (보안그룹은 443만 개방)
+5. `pm2 start "npm start" --name coinsignal` 또는 systemd 등록
+6. 로컬 `data/` 폴더(DB, master.key)를 복사하면 계좌·기록·키가 그대로 이전됩니다.
+
+## 폴더 구조
+
+```
+server/
+  index.ts            서버 시작, 재시작 복구, 스케줄러·텔레그램 시작
+  api.ts              REST API
+  auth.ts             관리자 로그인·세션·CSRF 방어
+  settings.ts         설정·암호화 키 저장·이벤트 로그
+  exchanges/public.ts 시세·캔들·호가·종목 정보 (3개 거래소)
+  exchanges/private.ts 잔고·시장가 주문·주문 조회 (3개 거래소 인증)
+  market/             지표, 스크리닝, 백테스트
+  ai/                 OpenAI 호출, 리서치 파이프라인, 모델·가격, 예산
+  engine/             계좌, 브로커(모의/실거래), 계획·승인, 리밸런싱, 리스크 감시, 스케줄러
+  notify/telegram.ts  알림·승인 버튼(롱폴링, 공인 IP 불필요)
+web/src/              React 화면 (대시보드, 계획·승인, AI 리서치, 시장·백테스트, 설정, 로그)
+tests/                단위 테스트 + 가짜 거래소/OpenAI 통합 테스트 (npm test)
+data/                 실행 시 생성: coinsignal.db, master.key  (Git 제외)
+```

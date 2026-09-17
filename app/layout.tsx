@@ -1,1 +1,0 @@
-import type { Metadata } from "next";import "./globals.css";export const metadata: Metadata={title:"CoinSignal | 코인 분석 · 모의투자",description:"국내 거래소 시세와 과거 이력으로 검증하는 개인 투자 연구실",icons:{icon:"/favicon.svg",shortcut:"/favicon.svg"}};export default function Layout({children}:{children:React.ReactNode}){return <html lang="ko"><body>{children}</body></html>}
