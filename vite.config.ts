@@ -8,7 +8,7 @@ export default defineConfig({
   server: {
     port: 5173,
     host: "127.0.0.1",
-    proxy: { "/api": { target: `http://127.0.0.1:${process.env.PORT || 8787}`, changeOrigin: false } },
+    proxy: { "/api": { target: `http://127.0.0.1:${process.env.PORT || 3032}`, changeOrigin: false } },
   },
   build: { outDir: "dist", emptyOutDir: true, chunkSizeWarningLimit: 1200 },
 });

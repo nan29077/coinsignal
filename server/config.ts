@@ -19,7 +19,7 @@ mkdirSync(dataDir, { recursive: true });
 
 export const config = {
   host: process.env.HOST || "127.0.0.1",
-  port: Number(process.env.PORT || 8787),
+  port: Number(process.env.PORT || 3032),
   dataDir,
   dbFile: path.join(dataDir, "coinsignal.db"),
   masterKeyFile: path.join(dataDir, "master.key"),

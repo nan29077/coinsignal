@@ -66,6 +66,17 @@ serve({ fetch: app.fetch, hostname: config.host, port: config.port }, (info) => 
   }
 });
 
+// On Windows `localhost` usually resolves to the IPv6 loopback first, so also listen on ::1 —
+// still loopback only, so this does not expose the app to the network.
+if (config.host === "127.0.0.1" || config.host === "localhost") {
+  try {
+    const v6 = serve({ fetch: app.fetch, hostname: "::1", port: config.port }, () => console.log(`http://localhost:${config.port} (IPv6 루프백) 으로도 접속할 수 있습니다.`));
+    v6.on("error", () => undefined);
+  } catch {
+    /* IPv6 unavailable: the IPv4 address still works */
+  }
+}
+
 for (const sig of ["SIGINT", "SIGTERM"] as const) {
   process.on(sig, () => {
     console.log("종료합니다.");

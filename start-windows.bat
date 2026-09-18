@@ -31,7 +31,7 @@ if errorlevel 1 (
   exit /b 1
 )
 
-echo [3/3] Starting CoinSignal. Open http://127.0.0.1:8787 in your browser.
+echo [3/3] Starting CoinSignal. Open http://localhost:3032 in your browser.
 echo Closing this window also stops automatic trading.
 echo.
 call npm start
