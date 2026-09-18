@@ -10,14 +10,17 @@ if errorlevel 1 (
   exit /b 1
 )
 
-if not exist node_modules (
-  echo [1/3] Installing dependencies ... this can take a few minutes.
-  call npm install
-  if errorlevel 1 (
-    echo [ERROR] npm install failed.
-    pause
-    exit /b 1
-  )
+echo [1/3] Checking dependencies ... (first run can take a few minutes)
+call npm install
+if errorlevel 1 (
+  echo [ERROR] npm install failed. Check the internet connection and run again.
+  pause
+  exit /b 1
+)
+if not exist "node_modules\@tailwindcss\vite" (
+  echo [ERROR] Dependencies look incomplete. Delete the node_modules folder, then run this file again.
+  pause
+  exit /b 1
 )
 
 echo [2/3] Building web UI ...
